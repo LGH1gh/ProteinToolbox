@@ -1,0 +1,1 @@
+from .tape_benchmark import TAPESecondaryStructureDecoder
