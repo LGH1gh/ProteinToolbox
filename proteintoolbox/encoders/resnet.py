@@ -5,11 +5,11 @@ from ..utils import get_activation_func
 from ..utils import get_activation_name
 
 class ProteinResnetEmbedding(nn.Module):
-  def __init__(self, args, dictionary) -> None:
+  def __init__(self, args, tokenizer) -> None:
     super().__init__()
     self.hidden_dim = args.hidden_dim
-    self.padding_idx = dictionary.padding_idx
-    self.token_embedding = nn.Embedding(len(dictionary), args.hidden_dim)
+    self.padding_idx = tokenizer.padding_idx
+    self.token_embedding = nn.Embedding(len(tokenizer), args.hidden_dim)
     inverse_frequency = 1 / (10000 ** (torch.arange(0.0, args.hidden_dim, 2.0) / args.hidden_dim))
     self.register_buffer('inverse_frequency', inverse_frequency)
 
@@ -26,7 +26,7 @@ class ProteinResnetEmbedding(nn.Module):
       dtype=x.dtype,
       device=x.device)
     sinusoidal_input = torch.ger(position_ids, self.inverse_frequency)
-    position_embedding = torch.cat([sinusoidal_input.sin(), sinusoidal_input.cos(), -1])
+    position_embedding = torch.cat([sinusoidal_input.sin(), sinusoidal_input.cos()], -1)
     position_embedding = position_embedding.unsqueeze(0)
     x = x + position_embedding
 
@@ -62,7 +62,7 @@ class ProteinResnetBlock(nn.Module):
     return x
 
 
-class ProteinResnetEncoder(nn.Module):
+class ProteinResnet(nn.Module):
   def __init__(self, args) -> None:
     super().__init__()
     self.layers = nn.ModuleList([
@@ -74,9 +74,10 @@ class ProteinResnetEncoder(nn.Module):
       x = layer(x, mask)
     return x
 
-class ProteinResnetRepresentation(nn.Module):
+class ProteinResnetEncoder(nn.Module):
+
   @classmethod
-  def add_args(parser):
+  def add_args(cls, parser):
     parser.add_argument("--hidden-layer-num", type=int, metavar="L", help="hidden layer num")
     parser.add_argument("--hidden-dim", type=int, metavar="H", help="hidden embedding dimension")
     parser.add_argument("--activation", choices=get_activation_name(), help="activation function to use")
@@ -84,9 +85,9 @@ class ProteinResnetRepresentation(nn.Module):
 
   def _init_weights(self, module):
     if isinstance(module, nn.Embedding):
-      module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+      module.weight.data.normal_(mean=0.0, std=0.02)
     elif isinstance(module, nn.Linear):
-      module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+      module.weight.data.normal_(mean=0.0, std=0.02)
       if module.bias is not None:
         module.bias.data.zero_()
     elif isinstance(module, nn.Conv1d):
@@ -94,14 +95,37 @@ class ProteinResnetRepresentation(nn.Module):
       if module.bias is not None:
         module.bias.data.zero_()
 
-  def __init__(self, args, dictionary) -> None:
+  def init_weights(self):
+    self.apply(self._init_weights)
+
+  def __init__(self, args, tokenizer) -> None:
     super().__init__()
     self.args = args
-    self.dictionary = dictionary
-    self.embedding = ProteinResnetEmbedding(args, dictionary)
-    self.encoder = ProteinResnetEncoder(args)
+    self.tokenizer = tokenizer
+    self.embedding = ProteinResnetEmbedding(args, tokenizer)
+    self.resnet = ProteinResnet(args)
 
-    self._init_weights()
+    self.init_weights()
+
+  def converter(self, sequences):
+    batch_size = len(sequences)
+
+    encoded_sequences = [self.tokenizer.encode(sequence) for sequence in sequences]
+    max_encoded_sequences_length = max(len(encoded_sequence) for encoded_sequence in encoded_sequences)
+    tokens = torch.empty(
+      (
+        batch_size,
+        max_encoded_sequences_length,
+      ),
+      dtype=torch.int64
+    )
+    tokens.fill_(self.tokenizer.padding_idx)
+
+    for i, encoded_sequence in enumerate(encoded_sequences):
+      encoded_sequence = torch.tensor(encoded_sequence, dtype=torch.int64)
+      tokens[i, :len(encoded_sequence)] = encoded_sequence
+
+    return tokens
 
   def forward(self, tokens, mask=None):
     if mask is not None and torch.any(mask != 1):
@@ -111,7 +135,10 @@ class ProteinResnetRepresentation(nn.Module):
       extended_mask = None
 
     x = self.embedding(tokens)
-    x = self.encoder(x.transpose(1, 2), extended_mask.transpose(1, 2)).transpose(1, 2)
+    x = x.transpose(1, 2)
+    if extended_mask is not None:
+      extended_mask = extend_mask.transpose(1, 2)
+    x = self.resnet(x, extended_mask).transpose(1, 2)
 
     return x
 

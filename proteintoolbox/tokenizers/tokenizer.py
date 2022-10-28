@@ -1,6 +1,6 @@
 import itertools
 from typing import Sequence, List
-import constant
+from .constant import PROTEIN_TOKS
 
 
 class OneHotTokenizer(object):
@@ -41,9 +41,9 @@ class OneHotTokenizer(object):
     return self.padding_idx
 
   @classmethod
-  def build_dictionary(cls):
-    standard_toks = list(constant.PROTEIN_TOKS.keys())
-    special_toks = ("<eos>", "<pad>", "<unk>")
+  def build_tokenizer(cls):
+    standard_toks = list(PROTEIN_TOKS.keys())
+    special_toks = ("X", "<eos>", "<pad>", "<unk>")
     return cls(standard_toks, special_toks)
 
   def _tokenize(self, text) -> str:

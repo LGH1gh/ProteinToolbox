@@ -1,1 +1,5 @@
-from .datasets import TAPESecondaryStructureDataset
+from .datasets import TAPESecondaryStructureDataModule
+
+DATA_MODULES = {
+  'TAPE_secondary_structure': TAPESecondaryStructureDataModule,
+}

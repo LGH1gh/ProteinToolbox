@@ -1,1 +1,5 @@
-from .resnet import ProteinResnetRepresentation
+from .resnet import ProteinResnetEncoder
+
+ENCODERS = {
+  'Resnet': ProteinResnetEncoder
+}
