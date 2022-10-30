@@ -31,20 +31,42 @@ class TAPESecondaryStructureModel(pl.LightningModule):
     logits = self.decoder(embedding)
 
     refined_labels = torch.empty(
-      (tokens.size(0), tokens.size(1)) , dtype=torch.int64
-    ).cuda()
+      (tokens.size(0), tokens.size(1)) , dtype=torch.int64, device=tokens.device
+    )
     refined_labels.fill_(self.ignore_index)
     for sequence_idx, label in enumerate(labels):
       refined_labels[sequence_idx, :len(label)] = torch.tensor(label)
 
     lprobs = F.log_softmax(logits.reshape(-1, logits.size(-1)), dim=-1, dtype=torch.float32)
     loss = F.nll_loss(lprobs, refined_labels.reshape(-1), ignore_index=self.ignore_index, reduction="mean")
-
+    self.log('train_loss', loss, logger=True, batch_size=self.args.train_batch_size)
     return loss
 
-  def validation_step(self, *args, **kwargs):
-    return super().validation_step(*args, **kwargs)
+  def validation_step(self, batch, batch_idx):
+    sequences, labels = zip(*batch)
+    tokens = self.encoder.converter(sequences).cuda()
+    embedding = self.encoder(tokens)
+    logits = self.decoder(embedding)
+
+    refined_labels = torch.empty(
+      (tokens.size(0), tokens.size(1)) , dtype=torch.int64, device=tokens.device
+    )
+    refined_labels.fill_(self.ignore_index)
+    for sequence_idx, label in enumerate(labels):
+      refined_labels[sequence_idx, :len(label)] = torch.tensor(label)
+    lprobs = F.log_softmax(logits.reshape(-1, logits.size(-1)), dim=-1, dtype=torch.float32)
+    outputs = {}
+    outputs['correct'] = sum(refined_labels.view(-1) == torch.argmax(lprobs.view(-1, lprobs.size(-1)), 1))
+    outputs['total'] = sum(refined_labels.ne(self.ignore_index).view(-1))
+    return outputs
+
+
+  def validation_epoch_end(self, outputs) -> None:
+    acc = sum([output['correct'] for output in outputs]) / sum([output['total'] for output in outputs])
+    self.log("val_acc", acc.data, prog_bar=True, on_epoch=True)
 
   def configure_optimizers(self):
-    optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-    return optimizer
+    optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
+    return [optimizer], [torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)]
+
+

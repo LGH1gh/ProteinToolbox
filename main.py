@@ -25,7 +25,6 @@ def main():
   encoder = ENCODERS[args.encoder_name](args, tokenizer)
   model = MODELS[args.dataset_name](args, tokenizer, encoder)
   print(args)
-  
   trainer = pl.Trainer.from_argparse_args(args)
   trainer.fit(model, datamodule=data_module)
   

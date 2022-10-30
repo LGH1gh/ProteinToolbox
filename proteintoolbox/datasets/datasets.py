@@ -70,6 +70,7 @@ class TAPESecondaryStructureDataModule(pl.LightningDataModule):
     parser.add_argument("--in-memory", type=bool, default=False)
     parser.add_argument("--train-batch-size", type=int)
     parser.add_argument("--inference-batch-size", type=int)
+    parser.add_argument("--worker-num", type=int)
 
   def __init__(self, args) -> None:
     super().__init__()
@@ -88,13 +89,13 @@ class TAPESecondaryStructureDataModule(pl.LightningDataModule):
     self.test_dataset = TAPESecondaryStructureDataset(self.args, self.task_test_name)
 
   def train_dataloader(self):
-    train_dataloader = DataLoader(self.train_dataset, batch_size=self.train_batch_size, collate_fn=lambda x: x)
+    train_dataloader = DataLoader(self.train_dataset, batch_size=self.train_batch_size, num_workers=self.args.worker_num, collate_fn=lambda x: x)
     return train_dataloader
 
   def val_dataloader(self):
-    valid_dataloader = DataLoader(self.valid_dataset, batch_size=self.inference_batch_size, collate_fn=lambda x: x)
+    valid_dataloader = DataLoader(self.valid_dataset, batch_size=self.inference_batch_size, num_workers=self.args.worker_num, collate_fn=lambda x: x)
     return valid_dataloader
 
   def test_dataloader(self):
-    test_dataloader = DataLoader(self.test_dataset, batch_size=self.inference_batch_size, collate_fn=lambda x: x)
+    test_dataloader = DataLoader(self.test_dataset, batch_size=self.inference_batch_size, num_workers=self.args.worker_num, collate_fn=lambda x: x)
     return test_dataloader

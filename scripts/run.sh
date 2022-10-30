@@ -12,10 +12,11 @@ python -u main.py \
   --encoder-name $ENCODER_NAME \
   --dataset-name $DATASET_NAME \
   --data-dir $DATA_DIR \
-  --hidden-layer-num 30 \
+  --hidden-layer-num 3 \
   --hidden-dim 512 \
   --activation gelu \
   --dropout 0.1 \
+  --worker-num 8 \
   --task-test-name cb513 \
   --task-type ss3 \
   --in-memory False \

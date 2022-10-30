@@ -9,11 +9,11 @@ class ProteinResnetEmbedding(nn.Module):
     super().__init__()
     self.hidden_dim = args.hidden_dim
     self.padding_idx = tokenizer.padding_idx
-    self.token_embedding = nn.Embedding(len(tokenizer), args.hidden_dim)
+    self.token_embedding = nn.Embedding(len(tokenizer), args.hidden_dim, padding_idx=tokenizer.padding_idx)
     inverse_frequency = 1 / (10000 ** (torch.arange(0.0, args.hidden_dim, 2.0) / args.hidden_dim))
     self.register_buffer('inverse_frequency', inverse_frequency)
 
-    self.layer_norm = nn.LayerNorm(args.hidden_dim, eps=1e-12)
+    self.layer_norm = nn.LayerNorm(args.hidden_dim)
     self.dropout = nn.Dropout(args.dropout)
   
   def forward(self, tokens):
@@ -59,6 +59,7 @@ class ProteinResnetBlock(nn.Module):
     x = self.conv2(x, mask)
     x = self.norm2(x.transpose(1, 2)).transpose(1, 2)
     x = x + residual
+    x = self.activation_fn(x)
     return x
 
 
@@ -73,6 +74,7 @@ class ProteinResnet(nn.Module):
     for layer in self.layers:
       x = layer(x, mask)
     return x
+    
 
 class ProteinResnetEncoder(nn.Module):
 
@@ -139,6 +141,5 @@ class ProteinResnetEncoder(nn.Module):
     if extended_mask is not None:
       extended_mask = extend_mask.transpose(1, 2)
     x = self.resnet(x, extended_mask).transpose(1, 2)
-
     return x
 
